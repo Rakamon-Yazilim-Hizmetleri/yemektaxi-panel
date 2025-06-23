@@ -85,6 +85,3 @@ Within the download you'll find the following directories and files:
 
 - Licensed under [MIT](https://github.com/devias-io/material-kit-react/blob/main/LICENSE.md)
 
-## Contact Us
-
-- Email Us: support@deviasio.zendesk.com
