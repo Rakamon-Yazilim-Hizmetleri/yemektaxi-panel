@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, ReactNode, useContext } from "react";
+import React, { createContext, ReactNode, useContext, useEffect } from "react";
 import { useLoginMutation } from "@/routers/auth-api";
 import type { LoginRequest, User } from "@/routers/auth-api";
 import { loginSuccess, logout, selectAuth, selectIsAuthenticated, selectUser } from "@/routers/auth-slice";
@@ -32,6 +32,28 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
 
 	const [loginMutation, { isLoading }] = useLoginMutation();
 
+	// Check for existing auth state on mount
+	useEffect(() => {
+		const storedToken = localStorage.getItem("authToken");
+		const storedUser = localStorage.getItem("user");
+
+		if (storedToken && storedUser && !isAuthenticated) {
+			try {
+				const userData = JSON.parse(storedUser);
+				dispatch(
+					loginSuccess({
+						user: userData,
+						token: storedToken,
+					})
+				);
+			} catch (error) {
+				console.error("Error parsing stored user data:", error);
+				localStorage.removeItem("authToken");
+				localStorage.removeItem("user");
+			}
+		}
+	}, [dispatch, isAuthenticated]);
+
 	const handleLogin = async (credentials: LoginRequest): Promise<{ success: boolean; error?: string }> => {
 		try {
 			const result = await loginMutation(credentials).unwrap();
@@ -51,12 +73,32 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
 					error: result.message || "Login failed",
 				};
 			}
-		} catch (error) {
+		} catch (error: unknown) {
 			console.error("Login error:", error);
-			return {
-				success: false,
-				error: error instanceof Error ? error.message : "An unexpected error occurred",
-			};
+
+			// Handle different types of errors
+			const errorObj = error as { status?: number; data?: { message?: string } };
+			if (errorObj?.status === 401) {
+				return {
+					success: false,
+					error: "Invalid email or password",
+				};
+			} else if (errorObj?.status === 400) {
+				return {
+					success: false,
+					error: "Please check your email and password",
+				};
+			} else if (errorObj?.data?.message) {
+				return {
+					success: false,
+					error: errorObj.data.message,
+				};
+			} else {
+				return {
+					success: false,
+					error: "Network error. Please try again.",
+				};
+			}
 		}
 	};
 
